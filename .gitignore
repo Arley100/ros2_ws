@@ -1,0 +1,5 @@
+cd ~/ros2_ws
+printf "build/\ninstall/\nlog/\n*.pyc\n__pycache__/\n" > .gitignore
+git add .gitignore
+git commit -m "Add .gitignore to exclude build artifacts"
+git push
