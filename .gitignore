@@ -1,0 +1,10 @@
+build/
+install/
+log/
+*.pyc
+__/
+build/
+install/
+log/
+*.pyc
+__pycache__/
