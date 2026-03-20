@@ -1,1 +1,0 @@
-/home/ndari/ros2_ws/py_pubsub/setup.py
