@@ -1,72 +1,99 @@
 # ROS 2 Workspace
-# SR-32 LED Controller (ROS2)
 
-## Overview
-This package implements LED state control for the rover based on system state messages received through ROS2.
+## SR-32 LED Controller (ROS2)
 
-The system listens to rover state updates and determines the corresponding LED color, preparing commands to be sent over CAN.
+### Overview
+
+This workspace contains the `sr32_led_cpp` package, which implements the SR-32 / SIL LED controller for Space Concordia Robotics.
+
+The controller:
+- subscribes to rover state updates through ROS2
+- maps rover states to LED behaviors
+- builds SIL CAN frames using the agreed 29-bit CAN layout
+- sends frames over SocketCAN
+- includes a standalone non-ROS test executable for direct SIL frame validation
 
 ---
 
-## Functionality
+## Package
 
-The node subscribes to:
+The main package is:
 
-/rover/state  (std_msgs/msg/String)
+- `src/sr32_led_cpp`
 
-It maps system states to LED colors as follows:
+---
 
-| Rover State  | LED Color |
-|-------------|----------|
-| autonomy     | RED      |
-| teleop       | BLUE     |
-| gps success  | GREEN    |
+## Current Functionality
+
+The ROS2 node subscribes to:
+
+- `/rover_state` (`std_msgs/msg/String`)
+
+Current state mapping:
+
+| Rover State       | SIL Behavior        |
+|------------------|---------------------|
+| `teleop`         | blue solid          |
+| `autonomy`       | green solid         |
+| `goal_reached`   | green blinking      |
+| `emergency_stop` | emergency/off frame |
+| `off`            | normal off frame    |
+
+---
+
+## CAN / SIL Protocol Used
+
+Current implementation uses:
+
+- **29-bit extended CAN**
+- Michael’s CAN layout:
+  - bits 28:24 -> `deviceType` (5 bits)
+  - bits 23:16 -> `manufacturer` (8 bits)
+  - bits 15:14 -> `severity` (2 bits)
+  - bits 13:6  -> `instruction` (8 bits)
+  - bits 5:0   -> `deviceId` (6 bits)
+
+Current SIL payload format follows Chloe’s firmware expectations:
+
+- byte 0 -> Red
+- byte 1 -> Green
+- byte 2 -> Blue
+- byte 3 -> Brightness
+- byte 4 -> BlinkEnable
+- byte 5 -> BlinkPeriod factor
+- byte 6 -> reserved / 0
+- byte 7 -> reserved / 0
+
+### Current Working Constants
+
+These are the current implementation values used in the package:
+
+- `MANUFACTURER = 0x08`
+- `DEVICE_ID = 0x0F`
+- `SEV_NORMAL = 0x02`
+- `SEV_EMERGENCY = 0x00`
+
+The following are still placeholders and may be updated later if hardware testing requires it:
+
+- `DEVICE_TYPE = 0x0E`
+- `INST_SET_LED = 0x00`
 
 ---
 
 ## Architecture
 
-ROS2 Node → State Interpretation → LED Controller → CAN Interface
+The package is structured as follows:
 
-- **ROS2 Node**: subscribes to rover state topic
-- **State Interpretation**: determines LED state
-- **LED Controller**: prepares CAN command
-- **CAN Interface**: currently a placeholder (pending integration)
-
----
-
-## Current Status
-
-- ROS2 node implementation: ✅ complete  
-- State-to-LED mapping: ✅ complete  
-- Logging and validation: ✅ complete  
-- CAN integration: ⏳ pending electrical specifications  
-
----
-
-## CAN Integration (Pending)
-
-The following information is required from the electrical subsystem before final integration:
-
-- CAN ID for LED controller  
-- Frame type (standard or extended)  
-- Payload format (byte structure for LED colors)  
-- Data length (DLC)  
-- Transmission behavior (event-based or periodic)  
-
----
-
-## Known Limitation
-
-⚠️ CAN communication is currently implemented as a placeholder.
-
-The system logs intended CAN messages but does not yet send real CAN frames.
-
----
-
-## Example Usage
-
-Run the node:
-
-```bash
-ros2 run sr32_led_cpp sr32_led_cpp_node
+```text
+sr32_led_cpp/
+├── CMakeLists.txt
+├── package.xml
+├── include/
+│   └── sr32_led_cpp/
+│       ├── led_controller.hpp
+│       ├── led_states.hpp
+│       └── sil_protocol.hpp
+└── src/
+    ├── led_controller.cpp
+    ├── sr32_led_node.cpp
+    └── test_sil_standalone.cpp
