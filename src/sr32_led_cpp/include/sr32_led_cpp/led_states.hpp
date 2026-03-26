@@ -1,13 +1,13 @@
+#pragma once
 
-#ifndef SR32_LED_CPP__LED_STATES_HPP_
-#define SR32_LED_CPP__LED_STATES_HPP_
+namespace sr32_led_cpp {
 
-enum class LedState
-{
-    AUTONOMY_RED,
-    TELEOP_BLUE,
-    GPS_SUCCESS_GREEN,
-    UNKNOWN
+enum class LedState {
+  OFF = 0,
+  TELEOP,
+  AUTONOMY,
+  GOAL_REACHED,
+  EMERGENCY_STOP
 };
 
-#endif
+}  // namespace sr32_led_cpp

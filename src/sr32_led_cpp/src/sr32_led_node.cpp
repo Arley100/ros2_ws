@@ -1,60 +1,71 @@
+#include <memory>
+#include <string>
+
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
+
 #include "sr32_led_cpp/led_controller.hpp"
 #include "sr32_led_cpp/led_states.hpp"
 
-class SR32LedCppNode : public rclcpp::Node
-{
+namespace sr32_led_cpp {
+
+class Sr32LedNode : public rclcpp::Node {
 public:
-    SR32LedCppNode()
-    : Node("sr32_led_cpp_node")
-    {
-        controller_.initialize_can();
-
-        subscription_ = this->create_subscription<std_msgs::msg::String>(
-            "/rover/state",
-            10,
-            std::bind(&SR32LedCppNode::state_callback, this, std::placeholders::_1)
-        );
-
-        RCLCPP_INFO(this->get_logger(), "SR-32 C++ node started");
+  Sr32LedNode() : Node("sr32_led_node"), controller_("vcan0") {
+    const bool ok = controller_.initialize_can();
+    if (!ok) {
+      RCLCPP_WARN(this->get_logger(), "CAN initialization reported failure.");
     }
+
+    subscription_ = this->create_subscription<std_msgs::msg::String>(
+        "rover_state",
+        10,
+        std::bind(&Sr32LedNode::state_callback, this, std::placeholders::_1));
+
+    RCLCPP_INFO(this->get_logger(), "sr32_led_node started. Listening on topic: rover_state");
+  }
 
 private:
-    void state_callback(const std_msgs::msg::String::SharedPtr msg)
-    {
-        std::string state = msg->data;
-        for (auto & c : state) c = std::tolower(c);
+  void state_callback(const std_msgs::msg::String::SharedPtr msg) {
+    const std::string state = msg->data;
+    LedState led_state = LedState::OFF;
 
-        if (state == "autonomy")
-        {
-            controller_.send_led_command(LedState::AUTONOMY_RED);
-            RCLCPP_INFO(this->get_logger(), "Autonomy detected -> RED LED");
-        }
-        else if (state == "teleop")
-        {
-            controller_.send_led_command(LedState::TELEOP_BLUE);
-            RCLCPP_INFO(this->get_logger(), "Teleop detected -> BLUE LED");
-        }
-        else if (state == "gps success" || state == "gps_success" || state == "success")
-        {
-            controller_.send_led_command(LedState::GPS_SUCCESS_GREEN);
-            RCLCPP_INFO(this->get_logger(), "GPS success detected -> GREEN LED");
-        }
-        else
-        {
-            RCLCPP_WARN(this->get_logger(), "Unknown rover state: %s", msg->data.c_str());
-        }
+    if (state == "teleop") {
+      led_state = LedState::TELEOP;
+    } else if (state == "autonomy") {
+      led_state = LedState::AUTONOMY;
+    } else if (state == "goal_reached") {
+      led_state = LedState::GOAL_REACHED;
+    } else if (state == "emergency_stop") {
+      led_state = LedState::EMERGENCY_STOP;
+    } else if (state == "off") {
+      led_state = LedState::OFF;
+    } else {
+      RCLCPP_WARN(this->get_logger(), "Unknown rover_state '%s', defaulting to OFF", state.c_str());
+      led_state = LedState::OFF;
     }
 
-    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr subscription_;
-    LedController controller_;
+    const bool sent = controller_.set_state(led_state);
+    if (!sent) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to stage LED command for state '%s'", state.c_str());
+      return;
+    }
+
+    RCLCPP_INFO(this->get_logger(),
+                "Mapped rover_state '%s' to CAN id 0x%X",
+                state.c_str(),
+                controller_.last_can_id());
+  }
+
+  LedController controller_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr subscription_;
 };
 
-int main(int argc, char * argv[])
-{
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<SR32LedCppNode>());
-    rclcpp::shutdown();
-    return 0;
+}  // namespace sr32_led_cpp
+
+int main(int argc, char * argv[]) {
+  rclcpp::init(argc, argv);
+  rclcpp::spin(std::make_shared<sr32_led_cpp::Sr32LedNode>());
+  rclcpp::shutdown();
+  return 0;
 }
