@@ -11,10 +11,18 @@ namespace sr32_led_cpp {
 
 class Sr32LedNode : public rclcpp::Node {
 public:
-  Sr32LedNode() : Node("sr32_led_node"), controller_("vcan0") {
-    const bool ok = controller_.initialize_can();
+  Sr32LedNode() : Node("sr32_led_node") {
+    this->declare_parameter<std::string>("can_interface", "can0");
+    const auto can_interface =
+        this->get_parameter("can_interface").as_string();
+
+    controller_ = std::make_unique<LedController>(can_interface);
+
+    const bool ok = controller_->initialize_can();
     if (!ok) {
-      RCLCPP_WARN(this->get_logger(), "CAN initialization reported failure.");
+      RCLCPP_WARN(this->get_logger(),
+                  "CAN initialization reported failure on interface '%s'.",
+                  can_interface.c_str());
     }
 
     subscription_ = this->create_subscription<std_msgs::msg::String>(
@@ -22,7 +30,9 @@ public:
         10,
         std::bind(&Sr32LedNode::state_callback, this, std::placeholders::_1));
 
-    RCLCPP_INFO(this->get_logger(), "sr32_led_node started. Listening on topic: rover_state");
+    RCLCPP_INFO(this->get_logger(),
+                "sr32_led_node started. Listening on topic: rover_state, using CAN interface: %s",
+                can_interface.c_str());
   }
 
 private:
@@ -41,23 +51,27 @@ private:
     } else if (state == "off") {
       led_state = LedState::OFF;
     } else {
-      RCLCPP_WARN(this->get_logger(), "Unknown rover_state '%s', defaulting to OFF", state.c_str());
+      RCLCPP_WARN(this->get_logger(),
+                  "Unknown rover_state '%s', defaulting to OFF",
+                  state.c_str());
       led_state = LedState::OFF;
     }
 
-    const bool sent = controller_.set_state(led_state);
+    const bool sent = controller_->set_state(led_state);
     if (!sent) {
-      RCLCPP_ERROR(this->get_logger(), "Failed to stage LED command for state '%s'", state.c_str());
+      RCLCPP_ERROR(this->get_logger(),
+                   "Failed to stage/send LED command for state '%s'",
+                   state.c_str());
       return;
     }
 
     RCLCPP_INFO(this->get_logger(),
                 "Mapped rover_state '%s' to CAN id 0x%X",
                 state.c_str(),
-                controller_.last_can_id());
+                controller_->last_can_id());
   }
 
-  LedController controller_;
+  std::unique_ptr<LedController> controller_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr subscription_;
 };
 

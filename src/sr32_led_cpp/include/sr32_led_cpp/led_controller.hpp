@@ -10,7 +10,7 @@ namespace sr32_led_cpp {
 
 class LedController {
 public:
-  explicit LedController(const std::string& can_interface = "vcan0");
+  explicit LedController(const std::string& can_interface = "can0");
   ~LedController();
 
   bool initialize_can();
