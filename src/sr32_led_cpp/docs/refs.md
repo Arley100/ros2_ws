@@ -27,10 +27,10 @@ This diagram shows the main flow of the package. The rover publishes a state, th
 
 ```mermaid
 flowchart LR
-    A[ros2 topic pub] --> B[/rover_state]
-    B --> C[sr32_led_node]
-    C --> D[vcan0]
-    D --> E[candump vcan0]
+    A["ros2 topic pub"] --> B["/rover_state"]
+    B --> C["sr32_led_node"]
+    C --> D["vcan0"]
+    D --> E["candump vcan0"]
 ```
 
 During local testing, the package does not need physical CAN hardware. Instead, it sends frames to `vcan0`, and `candump vcan0` is used to check whether the frames are being produced correctly.
